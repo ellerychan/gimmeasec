@@ -1,0 +1,2 @@
+# Should always be CRLF for Windows
+*.bat text eol=crlf

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Add one second of silence to the beginning of an audio file
+# Usage:    gimmeasec <audio_file> ...
+#
+# Example:  gimmeasec song.mp3
+#           - creates song_1s.mp3
+#           - does not modify song.mp3
+
+if (( $# < 1 )); then
+    echo "Usage:    gimmeasec <audio_file>"
+    echo ""
+    echo "Example:  gimmeasec song.mp3"
+    echo "          - creates song_1s.mp3"
+    echo "          - does not modify song.mp3"
+    exit 1
+fi
+
+audio_files=("$@")
+
+for f in "${audio_files[@]}"; do
+    ffmpeg -i "${f}" -af "adelay=1s:all=true" "${f%.*}_1s.${f##*.}"
+done
