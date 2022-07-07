@@ -7,19 +7,22 @@
 #           - does not modify song.mp3
 
 usage() {
-    echo "Prepend one second of silence to each audio file.  Runs 'ffmpeg' to"
-    echo "process the audio data."
-    echo ""
-    echo "Usage:    gimmeasec [-h] [-f] [-b <backup_dir>] <audio_file> [... ]"
-    echo "  where"
-    echo "          -b | --backup-dir   move originals to backup directory <backup_dir>"
-    echo "          -f | --force        keep going even if one of the audio files cannot be processed"
-    echo "          -h | --help         display this help message"
-    echo "          <audio_file> [...]  a list of one or more audio files to be modified"
-    echo ""
-    echo "Example:  gimmeasec song.mp3"
-    echo "          - creates song_1s.mp3"
-    echo "          - does not modify song.mp3"
+    cat << EOF >&2
+Prepend one second of silence to each audio file.  Runs 'ffmpeg' to
+process the audio data.
+
+Usage:  gimmeasec [-h] [-f] [-d SEC] [-b BACKUP_DIR] AUDIO_FILE [...]
+ where
+          -b | --backup-dir   move originals to backup directory BACKUP_DIR
+          -d | --delay        add SEC seconds of silence to the start of each audio file (default 1 sec.)
+          -f | --force        keep going even if one of the audio files cannot be processed
+          -h | --help         display this help message
+          AUDIO_FILE [...]  a list of one or more audio files to be modified
+
+Example:  gimmeasec song.mp3
+            - creates song_1s.mp3
+            - does not modify song.mp3
+EOF
     exit 1
 }
 
@@ -29,6 +32,7 @@ if (( ! $# )); then
 fi
 
 # Parse command line arguments
+delay=1
 audio_files=()
 
 while (( $# )); do
@@ -37,8 +41,17 @@ while (( $# )); do
             shift
             backup_dir="$1"
             if [[ ! -d "${backup_dir}" ]]; then
-                echo "Directory not found: ${backup_dir}"
-                echo "Run '$0 --help' to display the command line syntax"
+                echo "Directory not found: ${backup_dir}" >&2
+                echo "Run '$0 --help' to display the command line syntax" >&2
+                exit 1
+            fi
+            ;;
+        -d|--delay)
+            shift
+            delay="$1"
+            if [[ ! ${delay} =~ ^[0-9]+$ ]]; then
+                echo "DELAY must be an integer; got: ${delay}" >&2
+                echo "Run '$0 --help' to display the command line syntax" >&2
                 exit 1
             fi
             ;;
@@ -57,8 +70,8 @@ done
 
 # The ffmpeg command must exist
 if [[ ! -x $(command -v ffmpeg) ]]; then
-    echo "Could not find the 'ffmpeg' command.  'ffmpeg' must be installed and in"
-    echo "the executable search path."
+    echo "Could not find the 'ffmpeg' command.  'ffmpeg' must be installed and in" >&2
+    echo "the executable search path." >&2
     exit 1
 fi
 
@@ -67,7 +80,7 @@ for f in "${audio_files[@]}"; do
 
     # Make sure the audio file exists
     if [[ ! -f "${f}" ]]; then
-        echo "File not found: ${f}"
+        echo "File not found: ${f}" >&2
 
         # If the --force flag is set, keep going if file not found, else exit
         if [[ -z ${force} ]]; then
@@ -77,8 +90,8 @@ for f in "${audio_files[@]}"; do
 
     # Add silence to the front of the audio file.  If unsuccessful, exit unless
     # the --force flag is set.
-    [[ ffmpeg -i "${f}" -af "adelay=1s:all=true" "${f%.*}_1s.${f##*.}" ]] || \
-        [[ ! -z ${force} ]] || \
+    ffmpeg -i "${f}" -af "adelay=${delay}s:all=true" "${f%.*}_${delay}s.${f##*.}" || \
+       [[ ! -z ${force} ]] || \
         exit 1
 
     # Move the original file to the backup_dir, if defined
