@@ -1,5 +1,7 @@
 : Add one second of silence to an audio file
 : Author: Ellery Chan <ellery.chan@gmail.com>
+:   Date: 28-JUN-2022
+: Copyright (c) 2022 Ellery Chan
 @echo off
 setlocal enabledelayedexpansion
 : Add one second of silence to the beginning of an audio file
