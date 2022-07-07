@@ -6,17 +6,85 @@
 #           - creates song_1s.mp3
 #           - does not modify song.mp3
 
-if (( $# < 1 )); then
-    echo "Usage:    gimmeasec <audio_file>"
+usage() {
+    echo "Prepend one second of silence to each audio file.  Runs 'ffmpeg' to"
+    echo "process the audio data."
+    echo ""
+    echo "Usage:    gimmeasec [-h] [-f] [-b <backup_dir>] <audio_file> [... ]"
+    echo "  where"
+    echo "          -b | --backup-dir   move originals to backup directory <backup_dir>"
+    echo "          -f | --force        keep going even if one of the audio files cannot be processed"
+    echo "          -h | --help         display this help message"
+    echo "          <audio_file> [...]  a list of one or more audio files to be modified"
     echo ""
     echo "Example:  gimmeasec song.mp3"
     echo "          - creates song_1s.mp3"
     echo "          - does not modify song.mp3"
     exit 1
+}
+
+# There must be at least one command line argument
+if (( ! $# )); then
+    usage
 fi
 
-audio_files=("$@")
+# Parse command line arguments
+audio_files=()
 
-for f in "${audio_files[@]}"; do
-    ffmpeg -i "${f}" -af "adelay=1s:all=true" "${f%.*}_1s.${f##*.}"
+while (( $# )); do
+    case "$1" in
+        -b|--backup-dir)
+            shift
+            backup_dir="$1"
+            if [[ ! -d "${backup_dir}" ]]; then
+                echo "Directory not found: ${backup_dir}"
+                echo "Run '$0 --help' to display the command line syntax"
+                exit 1
+            fi
+            ;;
+        -f|--force)
+            force=1
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            audio_files+=("$1")
+            ;;
+    esac
+    shift
 done
+
+# The ffmpeg command must exist
+if [[ ! -x $(command -v ffmpeg) ]]; then
+    echo "Could not find the 'ffmpeg' command.  'ffmpeg' must be installed and in"
+    echo "the executable search path."
+    exit 1
+fi
+
+# Convert each audio file
+for f in "${audio_files[@]}"; do
+
+    # Make sure the audio file exists
+    if [[ ! -f "${f}" ]]; then
+        echo "File not found: ${f}"
+
+        # If the --force flag is set, keep going if file not found, else exit
+        if [[ -z ${force} ]]; then
+            exit 1
+        fi
+    fi
+
+    # Add silence to the front of the audio file.  If unsuccessful, exit unless
+    # the --force flag is set.
+    [[ ffmpeg -i "${f}" -af "adelay=1s:all=true" "${f%.*}_1s.${f##*.}" ]] || \
+        [[ ! -z ${force} ]] || \
+        exit 1
+
+    # Move the original file to the backup_dir, if defined
+    if [[ ! -z ${backup_dir} ]]; then
+        mv "${f}" "${backup_dir}/${f##*/}"
+    fi
+done
+
+exit 0
